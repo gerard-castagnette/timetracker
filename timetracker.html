@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a22;
+    --surface2: #22222e;
+    --border: #2e2e3e;
+    --accent: #7c6af7;
+    --accent-glow: rgba(124,106,247,0.25);
+    --green: #3ecf8e;
+    --green-glow: rgba(62,207,142,0.2);
+    --red: #f76a6a;
+    --text: #e8e8f0;
+    --text-muted: #7070a0;
+    --text-dim: #44445a;
+    --mono: 'DM Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 400px;
+    background: radial-gradient(ellipse, rgba(124,106,247,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 480px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .month-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+  }
+
+  /* ACTIVE CARD */
+  .active-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .active-card.running {
+    border-color: rgba(124,106,247,0.4);
+    box-shadow: 0 0 30px rgba(124,106,247,0.08);
+  }
+  .active-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .active-card.running::before { opacity: 1; }
+
+  .active-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .active-meta { flex: 1; }
+  .active-tag {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 4px;
+  }
+  .active-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .active-name.empty { color: var(--text-dim); font-weight: 400; font-style: italic; }
+
+  .timer-display {
+    font-family: var(--mono);
+    font-size: 36px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: -1px;
+    line-height: 1;
+    text-align: right;
+  }
+  .timer-display.paused { color: var(--text-muted); }
+
+  .active-bottom {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .pulse-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 1.5s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  .pulse-dot.paused {
+    background: var(--text-dim);
+    box-shadow: none;
+    animation: none;
+  }
+  .pulse-dot.idle { display: none; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .status-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+    flex: 1;
+  }
+
+  .pause-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .pause-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .pause-btn.hidden { display: none; }
+
+  /* SEARCH */
+  .search-wrap {
+    position: relative;
+    margin-bottom: 12px;
+  }
+  .search-icon {
+    position: absolute;
+    left: 14px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 14px;
+    pointer-events: none;
+  }
+  .search-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px 10px 38px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: var(--sans);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input::placeholder { color: var(--text-dim); }
+  .search-input:focus { border-color: var(--accent); }
+
+  /* PROJECTS */
+  .projects-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding: 0 2px;
+  }
+  .projects-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+  .add-project-btn {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 12px;
+    font-family: var(--mono);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .add-project-btn:hover { background: var(--accent-glow); }
+
+  .projects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .project-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .project-item:hover { border-color: rgba(124,106,247,0.35); background: #1e1e28; }
+  .project-item.active {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.08);
+  }
+  .project-item.active::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    border-radius: 3px 0 0 3px;
+  }
+
+  .proj-color {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .proj-name-text {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .proj-time {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .project-item.active .proj-time {
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .proj-delete {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 11px;
+    font-family: var(--mono);
+    padding: 2px 5px;
+    border-radius: 4px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.2s, color 0.2s, background 0.2s;
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+  }
+  .project-item:hover .proj-delete { opacity: 1; }
+  .proj-delete:hover { color: var(--red) !important; background: rgba(247,106,106,0.1); }
+
+  .drag-handle {
+    color: var(--text-dim);
+    font-size: 14px;
+    cursor: grab;
+    padding: 0 2px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+    line-height: 1;
+    user-select: none;
+  }
+  .project-item:hover .drag-handle { opacity: 1; }
+  .drag-handle:active { cursor: grabbing; }
+  .project-item.drag-over {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.12);
+  }
+  .project-item.drag-over::before {
+    content: '';
+    position: absolute;
+    top: -3px; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+    text-align: center;
+    padding: 24px;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-family: var(--mono);
+  }
+
+  /* FOOTER ACTIONS */
+  .footer-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    width: 100%;
+  }
+  .btn-recap {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 12px 8px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: var(--sans);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .btn-recap:hover { border-color: var(--accent); color: var(--text); }
+
+  .btn-stop-all {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 12px 8px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: var(--sans);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .btn-stop-all:hover { border-color: var(--red); color: var(--red); }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    padding: 20px;
+  }
+  .modal-overlay.show { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    width: 100%;
+    max-width: 440px;
+    transform: translateY(10px);
+    transition: transform 0.2s;
+  }
+  .modal-overlay.show .modal { transform: translateY(0); }
+  .modal h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: var(--text);
+  }
+  .modal-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: var(--sans);
+    outline: none;
+    margin-bottom: 16px;
+    transition: border-color 0.2s;
+  }
+  .modal-input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: var(--sans);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-cancel:hover { border-color: var(--text-muted); color: var(--text); }
+  .btn-confirm {
+    background: var(--accent);
+    border: none;
+    color: white;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: var(--sans);
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-confirm:hover { opacity: 0.85; }
+
+  /* RECAP MODAL */
+  .recap-list { margin-bottom: 20px; }
+  .recap-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .recap-item:last-child { border-bottom: none; }
+  .recap-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .recap-name { flex: 1; font-size: 14px; color: var(--text); }
+  .recap-time {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .recap-pct { font-size: 11px; color: var(--text-dim); font-family: var(--mono); min-width: 36px; text-align: right; }
+  .recap-bar-wrap { width: 60px; background: var(--surface2); border-radius: 3px; height: 4px; flex-shrink: 0; }
+  .recap-bar { height: 4px; border-radius: 3px; background: var(--accent); transition: width 0.3s; }
+  .recap-total {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: right;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .recap-total span { color: var(--text); font-weight: 500; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-family: var(--mono);
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">⏱ Time Tracker</div>
+    <div class="month-label" id="monthLabel"></div>
+  </div>
+
+  <!-- Active card -->
+  <div class="active-card" id="activeCard">
+    <div class="active-top">
+      <div class="active-meta">
+        <div class="active-tag">En cours</div>
+        <div class="active-name empty" id="activeName">Aucun projet actif</div>
+      </div>
+      <div class="timer-display" id="timerDisplay">00:00:00</div>
+    </div>
+    <div class="active-bottom">
+      <div class="pulse-dot idle" id="pulseDot"></div>
+      <div class="status-text" id="statusText">Sélectionne un projet pour commencer</div>
+      <button class="pause-btn hidden" id="pauseBtn" onclick="togglePause()">PAUSE</button>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input class="search-input" id="searchInput" placeholder="Rechercher un projet..." oninput="filterProjects()" autocomplete="off">
+  </div>
+
+  <!-- Projects -->
+  <div class="projects-header">
+    <span class="projects-label">Projets</span>
+    <button class="add-project-btn" onclick="openAddModal()">+ Ajouter</button>
+  </div>
+  <div class="projects-list" id="projectsList"></div>
+
+  <!-- Footer -->
+  <div class="footer-actions">
+    <button class="btn-recap" onclick="openRecap()">📊 Récap du mois</button>
+    <button class="btn-recap" onclick="openManualModal()">✏️ Saisie</button>
+    <button class="btn-stop-all" onclick="stopAll()" title="Arrêter le chrono">⏹ Stop</button>
+  </div>
+</div>
+
+<!-- Manual entry modal -->
+<div class="modal-overlay" id="manualModal">
+  <div class="modal">
+    <h2>Saisie manuelle</h2>
+
+    <!-- Project select -->
+    <div style="font-size:11px;color:var(--text-dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Projet</div>
+    <select class="modal-input" id="manualProject" style="cursor:pointer;">
+      <option value="">— Choisir un projet —</option>
+    </select>
+
+    <!-- Date -->
+    <div style="font-size:11px;color:var(--text-dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;margin-top:12px;">Date</div>
+    <input class="modal-input" type="date" id="manualDate">
+
+    <!-- Mode toggle -->
+    <div style="display:flex;gap:8px;margin:14px 0 10px;">
+      <button id="modeBtn1" onclick="setManualMode('range')"
+        style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--accent);background:var(--accent-glow);color:var(--accent);font-size:12px;font-family:var(--mono);cursor:pointer;">
+        Début → Fin
+      </button>
+      <button id="modeBtn2" onclick="setManualMode('duration')"
+        style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:transparent;color:var(--text-muted);font-size:12px;font-family:var(--mono);cursor:pointer;">
+        Durée en minutes
+      </button>
+    </div>
+
+    <!-- Range mode -->
+    <div id="manualRangeFields">
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--text-dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Début</div>
+          <input class="modal-input" type="time" id="manualStart">
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:11px;color:var(--text-dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Fin</div>
+          <input class="modal-input" type="time" id="manualEnd">
+        </div>
+      </div>
+    </div>
+
+    <!-- Duration mode -->
+    <div id="manualDurationFields" style="display:none;">
+      <div style="font-size:11px;color:var(--text-dim);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Durée (minutes)</div>
+      <input class="modal-input" type="number" id="manualDuration" min="1" max="1440" placeholder="ex: 45">
+    </div>
+
+    <div id="manualError" style="color:var(--red);font-size:12px;margin-bottom:4px;min-height:16px;font-family:var(--mono);"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('manualModal')">Annuler</button>
+      <button class="btn-confirm" onclick="confirmManual()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add project modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <h2>Nouveau projet</h2>
+    <input class="modal-input" id="newProjectName" placeholder="Nom du projet..." maxlength="50"
+      onkeydown="if(event.key==='Enter') confirmAdd()">
+    <div id="addModalError" style="color:var(--red);font-size:12px;margin-bottom:12px;min-height:16px;font-family:var(--mono);"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('addModal')">Annuler</button>
+      <button class="btn-confirm" onclick="confirmAdd()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Recap modal -->
+<div class="modal-overlay" id="recapModal">
+  <div class="modal">
+    <h2 id="recapTitle">Récap du mois</h2>
+    <div class="recap-list" id="recapList"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('recapModal')">Fermer</button>
+      <button class="btn-confirm" onclick="exportRecap()">Exporter CSV</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const COLORS = ['#7c6af7','#3ecf8e','#f7a46a','#f76a6a','#6acdf7','#c76af7','#f7e46a','#6af7c7','#f76ab3','#a4f76a','#6a8af7','#f7c76a'];
+const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+let state = {
+  projects: [],
+  sessions: [], // {projectId, start, end, minutes}
+  activeProjectId: null,
+  activeStart: null,
+  paused: false,
+  pausedAt: null,
+  pausedDuration: 0, // seconds already accumulated during this session
+};
+
+let timerInterval = null;
+
+// STORAGE
+function save() { localStorage.setItem('tt_state', JSON.stringify(state)); }
+function load() {
+  const raw = localStorage.getItem('tt_state');
+  if (raw) {
+    try {
+      const s = JSON.parse(raw);
+      state = { ...state, ...s };
+      // Restore dates
+      if (state.activeStart) state.activeStart = new Date(state.activeStart);
+      if (state.pausedAt) state.pausedAt = new Date(state.pausedAt);
+      state.sessions = (state.sessions || []).map(s => ({...s, start: new Date(s.start), end: s.end ? new Date(s.end) : null}));
+    } catch(e) {}
+  }
+  // Default projects if empty
+  if (!state.projects || state.projects.length === 0) {
+    state.projects = [
+      { id: uid(), name: 'Mon premier projet', color: COLORS[0] },
+    ];
+    save();
+  }
+}
+
+function uid() { return Math.random().toString(36).slice(2,10); }
+
+// TIME FORMATTING
+function fmtHMS(secs) {
+  const h = Math.floor(secs/3600), m = Math.floor((secs%3600)/60), s = secs%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function fmtHM(secs) {
+  const h = Math.floor(secs/3600), m = Math.round((secs%3600)/60);
+  if (h > 0 && m > 0) return `${h}h${String(m).padStart(2,'0')}`;
+  if (h > 0) return `${h}h`;
+  if (m === 0 && secs > 0) return `< 1min`;
+  return `${m}min`;
+}
+
+// ELAPSED for active session
+function getElapsedSeconds() {
+  if (!state.activeStart) return 0;
+  const base = state.pausedDuration || 0;
+  if (state.paused) return base;
+  const now = new Date();
+  const diff = Math.floor((now - state.activeStart) / 1000);
+  return base + diff;
+}
+
+// TOTAL seconds for a project this month
+function getProjectMonthSeconds(projectId) {
+  const now = new Date();
+  const month = now.getMonth(), year = now.getFullYear();
+  let total = 0;
+  for (const s of state.sessions) {
+    if (s.projectId !== projectId) continue;
+    const d = new Date(s.start);
+    if (d.getMonth() !== month || d.getFullYear() !== year) continue;
+    total += s.minutes * 60;
+  }
+  if (state.activeProjectId === projectId) total += getElapsedSeconds();
+  return total;
+}
+
+// SWITCH PROJECT
+function switchProject(projectId) {
+  if (state.activeProjectId === projectId) return;
+
+  // Stop current session
+  if (state.activeProjectId && state.activeStart) {
+    const elapsed = getElapsedSeconds();
+    state.sessions.push({
+      projectId: state.activeProjectId,
+      start: state.activeStart,
+      end: new Date(),
+      minutes: Math.round(elapsed / 60 * 100) / 100
+    });
+  }
+
+  // Start new session
+  state.activeProjectId = projectId;
+  state.activeStart = new Date();
+  state.paused = false;
+  state.pausedAt = null;
+  state.pausedDuration = 0;
+  save();
+
+  const proj = state.projects.find(p => p.id === projectId);
+  showToast(`▶ ${proj.name}`);
+  render();
+  startTimer();
+}
+
+function stopAll() {
+  if (!state.activeProjectId) return;
+  const elapsed = getElapsedSeconds();
+  if (elapsed > 5) {
+    state.sessions.push({
+      projectId: state.activeProjectId,
+      start: state.activeStart,
+      end: new Date(),
+      minutes: Math.round(elapsed / 60 * 100) / 100
+    });
+  }
+  state.activeProjectId = null;
+  state.activeStart = null;
+  state.paused = false;
+  state.pausedDuration = 0;
+  clearInterval(timerInterval);
+  save();
+  showToast('⏹ Arrêté');
+  render();
+}
+
+function togglePause() {
+  if (!state.activeProjectId) return;
+  if (!state.paused) {
+    // Pause
+    state.pausedDuration = getElapsedSeconds();
+    state.paused = true;
+    state.pausedAt = new Date();
+    clearInterval(timerInterval);
+    showToast('⏸ Pause');
+  } else {
+    // Resume
+    state.activeStart = new Date();
+    state.paused = false;
+    state.pausedAt = null;
+    startTimer();
+    showToast('▶ Reprise');
+  }
+  save();
+  render();
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    const secs = getElapsedSeconds();
+    document.getElementById('timerDisplay').textContent = fmtHMS(secs);
+    // Update active project time in list
+    const activeItem = document.querySelector('.project-item.active .proj-time');
+    if (activeItem) activeItem.textContent = fmtHM(getProjectMonthSeconds(state.activeProjectId));
+  }, 1000);
+}
+
+// RENDER
+function render() {
+  // Month label
+  const now = new Date();
+  document.getElementById('monthLabel').textContent = `${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+
+  // Active card
+  const card = document.getElementById('activeCard');
+  const nameEl = document.getElementById('activeName');
+  const timerEl = document.getElementById('timerDisplay');
+  const dot = document.getElementById('pulseDot');
+  const status = document.getElementById('statusText');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  if (state.activeProjectId) {
+    const proj = state.projects.find(p => p.id === state.activeProjectId);
+    nameEl.textContent = proj ? proj.name : '—';
+    nameEl.className = 'active-name';
+    timerEl.textContent = fmtHMS(getElapsedSeconds());
+    timerEl.className = state.paused ? 'timer-display paused' : 'timer-display';
+    card.className = state.paused ? 'active-card' : 'active-card running';
+    dot.className = state.paused ? 'pulse-dot paused' : 'pulse-dot';
+    status.textContent = state.paused ? 'En pause' : 'En cours...';
+    pauseBtn.className = 'pause-btn';
+    pauseBtn.textContent = state.paused ? 'REPRENDRE' : 'PAUSE';
+    if (!state.paused) startTimer();
+  } else {
+    nameEl.textContent = 'Aucun projet actif';
+    nameEl.className = 'active-name empty';
+    timerEl.textContent = '00:00:00';
+    timerEl.className = 'timer-display paused';
+    card.className = 'active-card';
+    dot.className = 'pulse-dot idle';
+    status.textContent = 'Sélectionne un projet pour commencer';
+    pauseBtn.className = 'pause-btn hidden';
+  }
+
+  filterProjects();
+}
+
+function filterProjects() {
+  const query = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+  const list = document.getElementById('projectsList');
+  list.innerHTML = '';
+
+  const filtered = state.projects.filter(p =>
+    !p.archived && (!query || p.name.toLowerCase().includes(query))
+  );
+
+  if (filtered.length === 0 && query) {
+    list.innerHTML = `<div class="no-results">Aucun projet trouvé</div>`;
+    return;
+  }
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="no-results">Aucun projet actif</div>`;
+    return;
+  }
+
+  for (const proj of filtered) {
+    const secs = getProjectMonthSeconds(proj.id);
+    const isActive = proj.id === state.activeProjectId;
+    const div = document.createElement('div');
+    div.className = 'project-item' + (isActive ? ' active' : '');
+    div.draggable = !query; // drag désactivé en mode recherche
+    div.dataset.id = proj.id;
+    div.innerHTML = `
+      ${!query ? `<div class="drag-handle" title="Glisser pour réordonner">⠿</div>` : ''}
+      <div class="proj-color" style="background:${proj.color}"></div>
+      <div class="proj-name-text">${proj.name}</div>
+      <div class="proj-time">${secs > 0 ? fmtHM(secs) : '—'}</div>
+      <button class="proj-delete" onclick="archiveProject('${proj.id}', event)" title="Archiver ce projet">Archiver</button>
+    `;
+    div.onclick = (e) => { if (!e.target.closest('.drag-handle') && !e.target.closest('.proj-delete')) switchProject(proj.id); };
+    // Drag events
+    div.addEventListener('dragstart', onDragStart);
+    div.addEventListener('dragover', onDragOver);
+    div.addEventListener('drop', onDrop);
+    div.addEventListener('dragend', onDragEnd);
+    list.appendChild(div);
+  }
+}
+
+// DRAG & DROP
+let dragSrcId = null;
+
+function onDragStart(e) {
+  dragSrcId = e.currentTarget.dataset.id;
+  e.currentTarget.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.project-item').forEach(el => el.classList.remove('drag-over'));
+  e.currentTarget.classList.add('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  const targetId = e.currentTarget.dataset.id;
+  if (!dragSrcId || dragSrcId === targetId) return;
+
+  const srcIdx = state.projects.findIndex(p => p.id === dragSrcId);
+  const tgtIdx = state.projects.findIndex(p => p.id === targetId);
+  if (srcIdx === -1 || tgtIdx === -1) return;
+
+  // Réordonner
+  const [moved] = state.projects.splice(srcIdx, 1);
+  state.projects.splice(tgtIdx, 0, moved);
+  save();
+  filterProjects();
+}
+function onDragEnd(e) {
+  e.currentTarget.style.opacity = '';
+  document.querySelectorAll('.project-item').forEach(el => el.classList.remove('drag-over'));
+}
+
+// ADD PROJECT
+function openAddModal() {
+  document.getElementById('newProjectName').value = '';
+  document.getElementById('addModalError').textContent = '';
+  document.getElementById('addModal').classList.add('show');
+  setTimeout(() => document.getElementById('newProjectName').focus(), 100);
+}
+function confirmAdd() {
+  const name = document.getElementById('newProjectName').value.trim();
+  const errorEl = document.getElementById('addModalError');
+  if (!name) return;
+
+  // Check doublon actif
+  const existing = state.projects.find(p => p.name.toLowerCase() === name.toLowerCase() && !p.archived);
+  if (existing) {
+    errorEl.textContent = `"${existing.name}" existe déjà dans tes projets actifs.`;
+    return;
+  }
+
+  // Check doublon archivé → proposer restauration
+  const archived = state.projects.find(p => p.name.toLowerCase() === name.toLowerCase() && p.archived);
+  if (archived) {
+    const totalSecs = getAllTimeSeconds(archived.id);
+    const msg = totalSecs > 0
+      ? `"${archived.name}" est archivé avec ${fmtHM(totalSecs)} de temps enregistré. Veux-tu le restaurer pour conserver cet historique ?`
+      : `"${archived.name}" est archivé. Veux-tu le restaurer ?`;
+    if (confirm(msg)) {
+      archived.archived = false;
+      save();
+      closeModal('addModal');
+      showToast(`♻ "${archived.name}" restauré`);
+      render();
+      return;
+    }
+    // L'utilisateur veut quand même un nouveau projet avec ce nom
+  }
+
+  const color = COLORS[state.projects.filter(p => !p.archived).length % COLORS.length];
+  state.projects.push({ id: uid(), name, color });
+  save();
+  closeModal('addModal');
+  showToast(`✓ "${name}" ajouté`);
+  render();
+}
+
+function getAllTimeSeconds(projectId) {
+  let total = 0;
+  for (const s of state.sessions) {
+    if (s.projectId === projectId) total += s.minutes * 60;
+  }
+  return total;
+}
+
+function archiveProject(id, e) {
+  e.stopPropagation();
+  const proj = state.projects.find(p => p.id === id);
+  if (!proj) return;
+  const totalSecs = getAllTimeSeconds(id);
+  const timeInfo = totalSecs > 0 ? ` (${fmtHM(totalSecs)} enregistré)` : '';
+  if (!confirm(`Archiver "${proj.name}"${timeInfo} ?\n\nLe projet disparaîtra de ta liste mais tout le temps loggué sera conservé dans le récap.`)) return;
+  if (state.activeProjectId === id) stopAll();
+  proj.archived = true;
+  save();
+  showToast(`📦 "${proj.name}" archivé`);
+  render();
+}
+
+// MANUAL ENTRY
+let manualMode = 'range';
+
+function openManualModal() {
+  // Populate project select
+  const sel = document.getElementById('manualProject');
+  sel.innerHTML = '<option value="">— Choisir un projet —</option>';
+  state.projects.filter(p => !p.archived).forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    sel.appendChild(opt);
+  });
+
+  // Default date = today
+  const today = new Date();
+  document.getElementById('manualDate').value = today.toISOString().slice(0,10);
+
+  // Default times
+  const hh = String(today.getHours()).padStart(2,'0');
+  const mm = String(today.getMinutes()).padStart(2,'0');
+  document.getElementById('manualStart').value = `${hh}:${mm}`;
+  document.getElementById('manualEnd').value = `${hh}:${mm}`;
+  document.getElementById('manualDuration').value = '';
+  document.getElementById('manualError').textContent = '';
+
+  setManualMode('duration');
+  document.getElementById('manualModal').classList.add('show');
+}
+
+function setManualMode(mode) {
+  manualMode = mode;
+  document.getElementById('manualRangeFields').style.display = mode === 'range' ? 'block' : 'none';
+  document.getElementById('manualDurationFields').style.display = mode === 'duration' ? 'block' : 'none';
+  const btn1 = document.getElementById('modeBtn1');
+  const btn2 = document.getElementById('modeBtn2');
+  if (mode === 'range') {
+    btn1.style.borderColor = 'var(--accent)'; btn1.style.background = 'var(--accent-glow)'; btn1.style.color = 'var(--accent)';
+    btn2.style.borderColor = 'var(--border)'; btn2.style.background = 'transparent'; btn2.style.color = 'var(--text-muted)';
+  } else {
+    btn2.style.borderColor = 'var(--accent)'; btn2.style.background = 'var(--accent-glow)'; btn2.style.color = 'var(--accent)';
+    btn1.style.borderColor = 'var(--border)'; btn1.style.background = 'transparent'; btn1.style.color = 'var(--text-muted)';
+  }
+}
+
+function confirmManual() {
+  const errorEl = document.getElementById('manualError');
+  const projectId = document.getElementById('manualProject').value;
+  const dateVal = document.getElementById('manualDate').value;
+  errorEl.textContent = '';
+
+  if (!projectId) { errorEl.textContent = 'Choisis un projet.'; return; }
+  if (!dateVal) { errorEl.textContent = 'Choisis une date.'; return; }
+
+  let minutes = 0;
+  let startDate, endDate;
+
+  if (manualMode === 'range') {
+    const startVal = document.getElementById('manualStart').value;
+    const endVal = document.getElementById('manualEnd').value;
+    if (!startVal || !endVal) { errorEl.textContent = 'Renseigne l\'heure de début et de fin.'; return; }
+    startDate = new Date(`${dateVal}T${startVal}`);
+    endDate = new Date(`${dateVal}T${endVal}`);
+    if (endDate <= startDate) { errorEl.textContent = 'L\'heure de fin doit être après le début.'; return; }
+    minutes = (endDate - startDate) / 60000;
+  } else {
+    const dur = parseInt(document.getElementById('manualDuration').value);
+    if (!dur || dur < 1) { errorEl.textContent = 'Durée invalide.'; return; }
+    startDate = new Date(`${dateVal}T09:00`);
+    endDate = new Date(startDate.getTime() + dur * 60000);
+    minutes = dur;
+  }
+
+  state.sessions.push({
+    projectId,
+    start: startDate,
+    end: endDate,
+    minutes: Math.round(minutes * 100) / 100,
+    manual: true
+  });
+  save();
+  closeModal('manualModal');
+  const proj = state.projects.find(p => p.id === projectId);
+  showToast(`✓ ${fmtHM(minutes * 60)} ajouté à "${proj.name}"`);
+  render();
+}
+
+
+function openRecap() {
+  const now = new Date();
+  const month = now.getMonth(), year = now.getFullYear();
+  document.getElementById('recapTitle').textContent = `Récap — ${MONTHS[month]} ${year}`;
+
+  // Calc totals
+  const totals = {};
+  for (const proj of state.projects) totals[proj.id] = 0;
+  for (const s of state.sessions) {
+    const d = new Date(s.start);
+    if (d.getMonth() !== month || d.getFullYear() !== year) continue;
+    if (!totals[s.projectId]) totals[s.projectId] = 0;
+    totals[s.projectId] += s.minutes * 60;
+  }
+  if (state.activeProjectId) {
+    if (!totals[state.activeProjectId]) totals[state.activeProjectId] = 0;
+    totals[state.activeProjectId] += getElapsedSeconds();
+  }
+
+  const grandTotal = Object.values(totals).reduce((a,b) => a+b, 0);
+  const allProjects = state.projects; // actifs + archivés
+  const sorted = allProjects
+    .map(p => ({ ...p, secs: totals[p.id] || 0 }))
+    .filter(p => p.secs > 0)
+    .sort((a,b) => b.secs - a.secs);
+
+  const listEl = document.getElementById('recapList');
+  if (sorted.length === 0) {
+    listEl.innerHTML = `<div style="color:var(--text-dim);font-size:13px;text-align:center;padding:20px;">Aucune session ce mois-ci</div>`;
+  } else {
+    listEl.innerHTML = sorted.map(p => {
+      const pct = grandTotal > 0 ? Math.round(p.secs / grandTotal * 100) : 0;
+      const archivedBadge = p.archived ? `<span style="font-size:10px;color:var(--text-dim);font-family:var(--mono);margin-left:4px;">archivé</span>` : '';
+      return `<div class="recap-item">
+        <div class="recap-dot" style="background:${p.color};opacity:${p.archived?0.5:1}"></div>
+        <div class="recap-name">${p.name}${archivedBadge}</div>
+        <div class="recap-bar-wrap"><div class="recap-bar" style="width:${pct}%"></div></div>
+        <div class="recap-pct">${pct}%</div>
+        <div class="recap-time">${fmtHM(p.secs)}</div>
+      </div>`;
+    }).join('') + `<div class="recap-total">Total du mois : <span>${fmtHM(grandTotal)}</span></div>`;
+  }
+
+  document.getElementById('recapModal').classList.add('show');
+}
+
+function exportRecap() {
+  const now = new Date();
+  const month = now.getMonth(), year = now.getFullYear();
+  let csv = 'Projet,Durée,Durée (minutes)\n';
+  for (const proj of state.projects) {
+    const secs = getProjectMonthSeconds(proj.id);
+    if (secs === 0) continue;
+    csv += `"${proj.name}","${fmtHM(secs)}",${Math.round(secs/60)}\n`;
+  }
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `timetracker_${MONTHS[month].toLowerCase()}_${year}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// TOAST
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timeout);
+  t._timeout = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// Click outside modal to close
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('show');
+  });
+});
+
+// INIT
+load();
+render();
+if (state.activeProjectId && !state.paused) startTimer();
+</script>
+</body>
+</html>
